@@ -35,7 +35,7 @@
     \vspace{2.5cm}
     {\large John Dion \quad Sanjana Kanchibotla Sri Lalitha \quad Kate Kiczales \quad Roman Nakhuda \quad Danish Siddiqui \par}
     \vfill
-    {\large \today \par}
+    {\large April 3, 2026 \par}
 \end{titlepage}
 
 \tableofcontents
@@ -44,8 +44,6 @@
 % ============================================================
 \section{Equity Options and the Volatility Surface}
 % ============================================================
-
-\subsection{Introduction}
 
 The \citet{BlackScholes1973} model prices European options under the assumption that
 implied volatility is constant across strikes and maturities. Real option markets violate
@@ -67,7 +65,8 @@ DGS1), which stood at 4.25\% per annum on August 29, 2025 \citep{FRED_DGS1}. A s
 flat rate is applied across all maturities; the 1-year tenor sits near the midpoint of
 the option maturity range (7 days to 2 years), and the sensitivity of implied volatility
 to the precise rate choice is negligible given the small magnitude of option rho relative
-to vega.
+to vega. Using a single rate introduces small bias for long maturities, but vega dominates rho,
+so IV estimates remain robust.
 
 \subsubsection{Data Filtering}
 
@@ -148,7 +147,10 @@ routinely quote these with wide spreads and conservative bid prices, placing the
 marginally below the theoretical floor. This is a quoting artifact rather than an
 arbitrage opportunity, and the exclusion does not materially affect the surface. As a
 cross-check, we compare our extracted IVs to OptionMetrics reference values for the
-3,638 options where both are available: Pearson correlation 0.9942, mean absolute error
+3,638 options where both are available \footnote{The comparison sample (n = 3,638) excludes 
+29 options with valid extracted implied volatilities but missing OptionMetrics values. 
+Validation metrics are computed on the matched subset for consistency.}: 
+Pearson correlation 0.9942, mean absolute error
 1.72 percentage points, RMSE 3.82 percentage points. The residual differences reflect
 rounding in the OptionMetrics data and minor differences in rate conventions.
 
@@ -171,7 +173,7 @@ Every stock exhibits a negatively sloped smile at every expiration: implied vola
 is highest at low strikes and falls as the strike rises. This equity put-skew has been a
 robust feature of option markets since at least \citet{Rubinstein1994}. The skew steepens
 at short maturities and flattens as $T$ grows, because near-term crash risk is priced
-more aggressively than long-run structural tail risk -- mean-reversion in volatility
+more aggressively than long-run structural tail risk; mean-reversion in volatility
 reduces the probability of sustained extreme outcomes over longer horizons.
 
 Stock-specific patterns are as follows. \textit{NVDA}: at October 2025 ($T \approx 0.12$
@@ -180,19 +182,42 @@ years), the smile descends from roughly 55\% near $K/S = 0.75$ to 35\% at the mo
 one-fifth of its near-term value ($-7.3$ versus $-37.5$) while ATM IV rises modestly to
 40\%, producing an upward-sloping term structure. \textit{XOM}: ATM IV is broadly stable
 at 17--19\% at short to medium maturities but declines to 14\% at two years. The skew
-slope collapses from $-51$ at one month to near zero by four months, and reverses
-slightly at long maturities where demand for upside calls from commodity hedgers is
-visible. \textit{JPM}: ATM IV traces a mild hump (20\% at one month, 22\% at four
-months, 19\% at two years); the slope narrows from $-58$ to near zero across the same
-range, so crash-risk pricing is almost entirely a short-horizon phenomenon. \textit{UAL}:
-ATM IV is locked at approximately 44\% from one month out to 16 months, a distinctively
-flat term structure reflecting persistent multi-source uncertainty. The slope does fall
-from $-37$ to $-7$ over that range. \textit{LLY}: the most complete flattening of the
-five stocks, with the slope moving from $-21$ at one month to essentially zero ($-0.2$)
-at two years, consistent with binary event risk that resolves once clinical or regulatory
+slope is steep at short maturities and collapses toward zero by four months. At medium
+maturities, certain expirations display a positively sloped fitted curve at high strikes,
+visible in Figure~\ref{fig:smile}; this pattern is most plausibly a numerical artifact
+of the quadratic fit being applied to a small number of sparse, illiquid far-out-of-the-money
+call quotes rather than a genuine market-implied premium for upside \citep{Jackwerth2000}.
+The near-ATM skew, which is better identified by liquid quotes, remains negative throughout.
+\textit{JPM}: ATM IV traces a mild hump (20\% at one month, 22\% at four months, 19\%
+at two years); the slope narrows from $-58$ to near zero across the same range, so
+crash-risk pricing is almost entirely a short-horizon phenomenon. \textit{UAL}: ATM IV
+is locked at approximately 44\% from one month out to 16 months, a distinctively flat
+term structure reflecting persistent multi-source uncertainty. The slope does fall from
+$-37$ to $-7$ over that range. \textit{LLY}: the most complete flattening of the five
+stocks, with the slope moving from $-21$ at one month to essentially zero ($-0.2$) at
+two years, consistent with binary event risk that resolves once clinical or regulatory
 decisions are made.
 
 \subsection{The Implied Volatility Surface}
+
+Figures~\ref{fig:surface_heatmap} and~\ref{fig:surface_3d} display the full surface for
+each stock as a heatmap and a 3D scatter, respectively.
+
+The dominant feature in all heatmaps is the horizontal color gradient: the left (low
+strike) portion is red and the right transitions to green, encoding the negative skew
+simultaneously across all maturities. This gradient is most pronounced for NVDA and is
+shallowest for LLY. The XOM heatmap is an exception to the otherwise clean pattern:
+linear interpolation onto the regular grid propagates the influence of sparse,
+illiquid far-out-of-the-money quotes, producing an elevated red region at high strikes
+and medium maturities that does not reflect genuine market pricing of the upside
+\citep{Jackwerth2000}. The near-ATM region of the XOM surface, which is well-identified
+by liquid data, retains the expected negative skew. In the maturity dimension, most
+surfaces slope slightly upward, indicating that long-horizon uncertainty is modestly
+higher than near-term realized expectations, with UAL being the exception whose surface
+is nearly flat across $T$. The interaction between the two dimensions, a compressed
+gradient at short $T$ that diffuses at long $T$, is consistent with stochastic volatility
+models in which near-term crash risk commands a premium that decays with horizon
+\citep{Heston1993}.
 
 \begin{figure}[H]
 \centering
@@ -210,19 +235,6 @@ encodes IV level. No interpolation is applied.}
 \label{fig:surface_3d}
 \end{figure}
 
-Figures~\ref{fig:surface_heatmap} and~\ref{fig:surface_3d} display the full surface for
-each stock as a heatmap and a 3D scatter, respectively.
-
-The dominant feature in all heatmaps is the horizontal color gradient: the left (low
-strike) portion is red and the right transitions to green, encoding the negative skew
-simultaneously across all maturities. The gradient is sharpest for NVDA and XOM and
-shallowest for LLY. In the maturity dimension, most surfaces slope slightly upward,
-indicating that long-horizon uncertainty is modestly higher than near-term realized
-expectations, with UAL being the exception whose surface is nearly flat across $T$. The
-interaction between the two dimensions -- a compressed gradient at short $T$ that
-diffuses at long $T$ -- is the heatmap signature of stochastic volatility: near-term
-crash risk commands a premium that decays with horizon.
-
 \subsection{Cross-Sectional Comparison}
 
 \subsubsection{Methodology}
@@ -235,25 +247,6 @@ slope indicates a larger premium for out-of-the-money puts relative to ATM optio
 is the standard definition of the volatility skew \citep{Hull2022}.
 
 \subsubsection{Results}
-
-Table~\ref{tab:summary} and Figures~\ref{fig:comparison}--\ref{fig:overlay} present the
-summary statistics and cross-sectional comparisons.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\textwidth]{q1_smile_overlay.png}
-\caption{Smile overlay at the nearest 3-month expiration for direct cross-sectional
-comparison.}
-\label{fig:overlay}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{q1_comparison.png}
-\caption{ATM implied volatility (left) and skew slope (right) for all five stocks.}
-\label{fig:comparison}
-\end{figure}
-
 \begin{table}[H]
 \centering
 \caption{ATM implied volatility and skew slope at the nearest 3-month expiration.
@@ -272,6 +265,24 @@ UAL  & Airlines          & 44.0 & $-14.3$ \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{q1_smile_overlay.png}
+\caption{Smile overlay at the nearest 3-month expiration for direct cross-sectional
+comparison.}
+\label{fig:overlay}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{q1_comparison.png}
+\caption{ATM implied volatility (left) and skew slope (right) for all five stocks.}
+\label{fig:comparison}
+\end{figure}
+
+Table~\ref{tab:summary} and Figures~\ref{fig:overlay}--\ref{fig:comparison} present the
+summary statistics and cross-sectional comparisons.
+
 \subsubsection{Interpretation}
 
 \textbf{UAL leads on ATM IV (44.0\%).} Airlines combine high fixed costs, thin margins,
@@ -287,13 +298,15 @@ without an equivalent probability of a further gain. Investors accumulated put p
 aggressively, bidding up the left wing and producing a steep skew despite the absence of
 the regulatory or commodity risk present in other sectors.
 
-\textbf{XOM second steepest skew ($-21.8$) despite the lowest ATM IV (18.1\%).} Energy
-equity faces a specific directional risk: commodity price collapse. Historical oil price
-crashes have been severe and rapid (1986, 1998, 2008, 2014, 2020), and this asymmetric
-left-tail history is embedded in energy option pricing as a steep skew. The contrast with
-UAL illustrates that IV level and skew slope measure different things: UAL's uncertainty
-is multidirectional and elevates the ATM level broadly, while XOM's dominant risk is
-directional and concentrates the premium in the left wing.
+\textbf{XOM second steepest skew ($-21.8$) despite the lowest ATM IV (18.1\%).} The
+skew slope reported in Table~\ref{tab:summary} is estimated over the liquid near-ATM
+range $K/S \in [0.70, 1.30]$, where XOM quotes are well identified. Energy equity faces
+a specific directional risk: commodity price collapse. Historical oil price crashes have
+been severe and rapid (1986, 1998, 2008, 2014, 2020), and this asymmetric left-tail
+history is reflected in energy option pricing as a steep near-ATM skew \citep{Doran2008}.
+The contrast with UAL illustrates that IV level and skew slope measure different things:
+UAL's uncertainty is multidirectional and elevates the ATM level broadly, while XOM's
+dominant risk is directional and concentrates the premium in the left wing.
 
 \textbf{LLY shallowest skew ($-4.7$).} Pharmaceutical equity faces two-sided binary
 event risk from clinical and regulatory outcomes. Because the downside (trial failure) is
@@ -301,19 +314,20 @@ not systematically more probable or more severe than the upside (approval), the 
 close to symmetric. LLY's ATM IV of 26.9\% exceeds XOM's precisely because uncertainty
 is elevated but not directionally biased.
 
-\textbf{JPM: bank vs technology vs airline.} JPM's skew of $-8.8$ is the second shallowest
-despite banking's well-documented systemic risk. The Federal Reserve stress-testing
-framework, Basel III capital requirements, and FDIC deposit guarantees collectively
-bound the probability of the most catastrophic left-tail outcomes for large US banks.
-NVDA's AI rerating risk and UAL's operating leverage carry no equivalent institutional
-backstop, which is why both generate steeper skews than a bank with balance-sheet
-exposure to the entire economy.
+\textbf{JPM: bank vs.\ technology vs.\ airline.} JPM's skew of $-8.8$ is the second
+shallowest despite banking's well-documented systemic risk. The Federal Reserve
+stress-testing framework, Basel III capital requirements, and FDIC deposit guarantees
+collectively bound the probability of the most catastrophic left-tail outcomes for large
+US banks. NVDA's AI rerating risk and UAL's operating leverage carry no equivalent
+institutional backstop, which is why both generate steeper skews than a bank with
+balance-sheet exposure to the entire economy.
 
 \textbf{Black--Scholes implication.} The non-flat surface is direct evidence of model
 misspecification: real return distributions exhibit negative skewness and excess kurtosis
-relative to the log-normal. Stochastic volatility models, such as \citet{Heston1993},
-address this by allowing instantaneous variance to follow its own mean-reverting process,
-which generates the maturity-dependent negative skew that Black--Scholes cannot produce.
+relative to the log-normal \citep{Rubinstein1994}. Stochastic volatility models, such as
+\citet{Heston1993}, address this by allowing instantaneous variance to follow its own
+mean-reverting process, which generates the maturity-dependent negative skew that
+Black--Scholes cannot produce.
 
 % ============================================================
 \section{Option Pricing: Black-Scholes, Monte Carlo, and Binomial Trees}
@@ -359,6 +373,11 @@ Board of Governors of the Federal Reserve System (US) (2025).
 Federal Reserve Bank of St.\ Louis FRED database.
 Retrieved from \url{https://fred.stlouisfed.org/series/DGS1}, August 29, 2025.
 
+\bibitem[Doran and Ronn(2008)]{Doran2008}
+Doran, J.\ S.\ and Ronn, E.\ I.\ (2008).
+Computing the market price of volatility risk in the energy commodity markets.
+\textit{Journal of Banking and Finance}, 32(12), 2541--2552.
+
 \bibitem[Heston(1993)]{Heston1993}
 Heston, S.\ L.\ (1993).
 A closed-form solution for options with stochastic volatility with applications to bond
@@ -369,6 +388,11 @@ and currency options.
 Hull, J.\ C.\ (2022).
 \textit{Options, Futures, and Other Derivatives}, 11th ed.
 Pearson, New York.
+
+\bibitem[Jackwerth(2000)]{Jackwerth2000}
+Jackwerth, J.\ C.\ (2000).
+Recovering risk aversion from option prices and realized returns.
+\textit{Review of Financial Studies}, 13(2), 433--451.
 
 \bibitem[Rubinstein(1994)]{Rubinstein1994}
 Rubinstein, M.\ (1994).
