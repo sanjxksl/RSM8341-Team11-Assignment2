@@ -1,0 +1,6 @@
+Ticker,Sector,ATM IV (%),Skew Slope,Skew T (years),n (skew fit)
+NVDA,Technology / AI,39.77,-23.68,0.23,18
+JPM,Banking,20.87,-8.77,0.23,25
+XOM,Energy,18.12,-21.81,0.23,9
+LLY,Pharmaceuticals,26.9,-4.74,0.23,39
+UAL,Airlines,43.96,-14.29,0.307,18
