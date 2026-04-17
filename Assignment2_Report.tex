@@ -358,8 +358,8 @@ $N(\cdot)$ is the standard normal cumulative distribution function (CDF).
 
 [TODO: expand?]
 
-The Black-Scholes price of the LLY call option is $79.50. 
-We use this price as the benckmark for the Monte Carlo and binomial lattice pricing.
+The Black-Scholes price of the LLY call option is \$79.50.
+We use this price as the benchmark for the Monte Carlo and binomial lattice pricing.
 
 [TODO: interpret?]
 
@@ -372,6 +372,129 @@ We use this price as the benckmark for the Monte Carlo and binomial lattice pric
 % ============================================================
 \section{Pricing Exotic Options}
 % ============================================================
+
+Using Monte Carlos, we can price \textit{any} derivative whose payoff can be simulated, which wasn't possible using geometric Brownian motion. In particular, path-dependent options for which no closed-form solution exists can also be priced using Monte Carlo. We
+price two such exotic options on LLY using the same parameters as Section~2: $S_0 =
+\$939.47$, $K = \$939.47$ (at the money), $T = 0.5$ years, $r = 3.71\%$, $\sigma =
+26.90\%$. Full daily price paths are simulated via the Euler--Maruyama scheme with
+$n = 126$ steps ($\Delta t = T/n$). The number of paths $N$ is chosen so that the
+Monte Carlo standard error is below \$0.9395 (0.1\% of $S_0$); we use $N = 1{,}000{,}000$
+throughout and verify the criterion is met for both options.
+
+\subsection{Arithmetic Asian Call}
+
+The \textbf{arithmetic Asian call} replaces the terminal stock price $S_T$ with the
+time-average over the life of the option:
+\begin{equation}
+    \text{Payoff} = \max(\bar{S} - K,\; 0), \qquad
+    \bar{S} = \frac{1}{n} \sum_{i=1}^{n} S_{t_i}.
+    \label{eq:asian}
+\end{equation}
+No closed-form solution exists for this payoff under geometric Brownian motion. The simulation
+tracks the running sum of prices at each of the 126 daily steps and divides by $n$ at
+expiry to obtain $\bar{S}$ without storing full path matrices. 
+
+\begin{table}[H]
+\centering
+\caption{Arithmetic Asian call results ($N = 1{,}000{,}000$ paths).}
+\label{tab:asian}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+MC price                & \$45.37 \\
+Simulation Time         & 1.18 s \\
+Standard error (SE)     & \$0.07 \\
+SE criterion met?       & Yes (\$0.07 $<$ \$0.94) \\
+95\% confidence interval & [\$45.24,\ \$45.51] \\
+Black--Scholes benchmark & \$79.50 \\
+Asian vs.\ vanilla      & $-$\$34.12 ($-$42.9\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Asian call costs \$45.37, roughly 43\% less than the vanilla European call at
+\$79.50. Averaging dampens the effective volatility of the payoff: extreme terminal
+prices, whether very high or very low, are pulled toward the path mean, so the
+distribution of $\bar{S}$ has lower variance than that of $S_T$. By having lower volatility, the option is less risky, and thus, has a lower option premium. 
+
+\subsection{Floating-Strike Lookback Call}
+
+The \textbf{floating-strike lookback call} sets the strike retroactively to the minimum
+price reached over the life of the option, giving the holder perfect hindsight on entry:
+\begin{equation}
+    \text{Payoff} = S_T - \min_{0 \le t \le T} S_t.
+    \label{eq:lookback}
+\end{equation}
+The payoff is \textit{always non-negative} by construction: $S_T \ge \min_{t} S_t$
+holds on every path. 
+\begin{table}[H]
+\centering
+\caption{Floating-strike lookback call results ($N = 1{,}000{,}000$ paths).}
+\label{tab:lookback}
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+MC price                & \$134.33 \\
+Standard error (SE)     & \$0.12 \\
+SE criterion met?       & Yes (\$0.12 $<$ \$0.94) \\
+95\% confidence interval & [\$134.09,\ \$134.57] \\
+Black--Scholes benchmark & \$79.50 \\
+Lookback vs.\ vanilla   & $+$\$54.83 ($+$69.0\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The lookback option costs \$134.33, a 69\% premium over the vanilla call. Two effects
+drive this: \\
+
+First, the payoff can never be zero: on every single path the holder profits
+by at least the difference between $S_T$ and the path minimum, whereas a vanilla call
+expires worthless whenever $S_T < K$. \\
+
+Second, the effective strike depends on the path because it is retroactively determined after the fact. On a path that dips to \$800 before recovering to \$950, the
+lookback pays \$150 while the ATM vanilla pays only \$10.53. The real-world motivation for paying this premium is perfect downside protection combined with full upside participation: an investor who fears missing the optimal entry point but still wants equity exposure would find the lookback compelling, albeit expensive.
+
+\subsection{Comparison}
+
+Table~\ref{tab:exotic_comparison} and Figure~\ref{fig:q3_comparison} summarize all three
+options. The pricing hierarchy---Asian $<$ Vanilla $<$ Lookback---reflects the
+information available to each payoff function at expiry. The vanilla call uses only the
+terminal price; the Asian call uses the average, which is less extreme; the lookback call
+uses both the terminal price and the worst-case entry, the most favorable possible
+information set.
+
+\begin{table}[H]
+\centering
+\caption{Summary comparison: vanilla European call (Black--Scholes) vs.\ two exotic calls (Monte Carlo, $N = 1{,}000{,}000$).}
+\label{tab:exotic_comparison}
+\begin{tabular}{llrrl}
+\toprule
+Option & Method & Price (\$) & SE (\$) & Payoff \\
+\midrule
+Vanilla European  & Black--Scholes   & 79.50  & --- & $\max(S_T - K,\;0)$ \\
+Arithmetic Asian  & Monte Carlo      & 45.37  & 0.07 & $\max(\bar{S} - K,\;0)$ \\
+Floating Lookback & Monte Carlo      & 134.33 & 0.12 & $S_T - \min_t S_t$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Asian call provides the least ``insurance'': the averaging means it pays out less
+even when markets move favourably, making it the cheapest but also the least protective
+instrument. The lookback provides the most insurance: it guarantees the holder the
+best possible entry price in hindsight, making it the most expensive. The vanilla call
+sits in between, paying out only if the terminal price exceeds the fixed strike.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{q3_comparison.png}
+\caption{Monte Carlo prices for the three LLY 6-month call options. Error bars show
+95\% confidence intervals ($\pm 1.96 \times \text{SE}$). The vanilla price is exact
+(Black--Scholes); MC uncertainty bars for Asian and lookback options are narrower than
+the bar width at this scale.}
+\label{fig:q3_comparison}
+\end{figure}
 
 % ============================================================
 \section{The CIR Model and Bond Pricing}
