@@ -333,6 +333,42 @@ Black--Scholes cannot produce.
 \section{Option Pricing: Black-Scholes, Monte Carlo, and Binomial Trees}
 % ============================================================
 
+In this section, we price the same European call option using three different 
+approaches: Black-Scholes (closed-form), Monte Carlo simulation, and a binomial lattice model. 
+The chosen stock for the European call option is Eli Lilly and Company (LLY).
+
+We use the following information for the pricing:
+- On April 10th, 2026, LLY closed at $939.47 per share (CITE). 
+- As of April 9th, 2026, the risk-free rate for U.S. Treasury Securities at 6-Month Constant Maturity is 3.71\% (CITE).
+- The time to expiry is 6 months.
+- For an at-the-money European call option, the strike price is equal to the stock price, $939.47.
+- The at-the-money implied volatility for LLY, calculated in Section 1, is 26.90\%. 
+
+\subsubsection{Black-Scholes}
+
+In this section, we price the European call option using the Black-Scholes formula.
+The Black-Scholes formula for a European call option is:
+
+$$C = S\,N(d_1) - K e^{-rT} N(d_2), \qquad
+d_1 = \frac{\ln(S/K) + (r + \sigma^2/2)\,T}{\sigma\sqrt{T}}, \quad
+d_2 = d_1 - \sigma\sqrt{T},
+$$
+where $S$ is the stock price, $K$ is the strike price, $T$ is the time to expiry, $r$ is the risk-free rate, and $\sigma$ is the implied volatility.
+$N(\cdot)$ is the standard normal cumulative distribution function (CDF).
+
+[TODO: expand?]
+
+The Black-Scholes price of the LLY call option is $79.50. 
+We use this price as the benckmark for the Monte Carlo and binomial lattice pricing.
+
+[TODO: interpret?]
+
+\subsubsection{Monte Carlo}
+
+
+
+\subsubsection{Binomial Lattice}
+
 % ============================================================
 \section{Pricing Exotic Options}
 % ============================================================
