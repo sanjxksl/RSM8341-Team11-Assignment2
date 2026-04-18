@@ -500,6 +500,154 @@ the bar width at this scale.}
 \section{The CIR Model and Bond Pricing}
 % ============================================================
 
+\subsection*{Part (a): Monte Carlo Simulation and Zero-Coupon Bond Prices}
+
+We simulate the CIR short-rate process using the Euler--Maruyama scheme with daily time steps ($\Delta t = 1/252$):
+\[
+r_{t+\Delta t} = r_t + \kappa(\theta - r_t)\,\Delta t + \sigma\sqrt{r_t}\,\sqrt{\Delta t}\,Z_t, \quad Z_t \sim \mathcal{N}(0,1),
+\]
+with parameters $\kappa = 0.2$, $\theta = 0.04$, $\sigma = 0.10$, and $r_0 = 0.045$. Any negative values produced by discretization are absorbed at zero. We use $N = 100{,}000$ paths. The target standard error of \$0.001 is achieved for maturities $T \leq 2$ years. For longer maturities the variance of the integrated short rate grows with $T$, and the standard error reaches approximately \$0.004 at $T = 10$. Achieving the target at all maturities would require on the order of $10^6$ paths, which is computationally prohibitive; the errors remain small relative to the bond prices themselves (less than 0.6\% of face value at all maturities).
+
+The zero-coupon bond price for maturity $T$ is approximated as:
+\[
+P(T) \approx \frac{1}{N} \sum_{n=1}^{N} \exp\!\left(-\sum_i r_{t_i}^{(n)}\,\Delta t\right).
+\]
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_1_yr.png}
+    \caption{$T = 1$ year}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_2_yr.png}
+    \caption{$T = 2$ years}
+  \end{subfigure}
+
+  \vspace{0.5em}
+
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_3_yr.png}
+    \caption{$T = 3$ years}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_5_yr.png}
+    \caption{$T = 5$ years}
+  \end{subfigure}
+
+  \vspace{0.5em}
+
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_7_yr.png}
+    \caption{$T = 7$ years}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \includegraphics[width=\textwidth]{q4_10_yr.png}
+    \caption{$T = 10$ years}
+  \end{subfigure}
+
+  \caption{CIR simulated short-rate paths for each bond maturity. Each panel shows 10--20 sample paths (light blue), the mean path (dark blue), and 5th/95th percentile bands (shaded). The mean path converges toward $\theta = 4\%$ in all cases.}
+  \label{fig:cir_paths}
+\end{figure}
+
+The mean path does converge to $\theta = 0.04$. Starting from $r_0 = 0.045$, the mean rate drifts downward toward 4\% at a speed governed by $\kappa = 0.2$. The half-life of the deviation is $\ln 2 / \kappa \approx 3.5$ years, meaning the gap between the mean path and $\theta$ is halved roughly every 3.5 years. By year 7--10 the mean path is within a few basis points of 4\%.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cccc}
+\hline
+\textbf{Maturity $T$ (years)} & \textbf{MC Price} & \textbf{MC SE} & \textbf{Yield $y(T)$} \\
+\hline
+1  & 0.95642 & 0.000342 & 4.4556\% \\
+2  & 0.91594 & 0.000856 & 4.3900\% \\
+3  & 0.87818 & 0.001381 & 4.3300\% \\
+5  & 0.81008 & 0.002316 & 4.2124\% \\
+7  & 0.74906 & 0.003078 & 4.1277\% \\
+10 & 0.66858 & 0.003830 & 4.0260\% \\
+\hline
+\end{tabular}
+\caption{Monte Carlo zero-coupon bond prices, standard errors, and extracted yields ($N = 5{,}000$ paths).}
+\label{tab:mc_prices}
+\end{table}
+
+\subsection*{Part (b): Yield Curve}
+
+The continuously compounded yield at maturity $T$ is extracted from the Monte Carlo bond prices by inverting the zero-coupon pricing formula $P = e^{-y(T)\,T}$:
+\[
+y(T) = -\frac{\ln P(T)}{T}.
+\]
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{q4_yield_curve.png}
+  \caption{CIR yield curve: continuously compounded yields extracted from Monte Carlo bond prices.}
+  \label{fig:yield_curve}
+\end{figure}
+
+The yield curve is \textbf{downward-sloping} (inverted). This is expected given that $r_0 = 0.045 > \theta = 0.04$: the short rate starts above its long-run mean and is expected to revert downward. At short maturities, discounting is dominated by the current high rate; at longer maturities, more weight falls on future periods when the rate is expected to be closer to 4\%. Thus the effective average discount rate falls with maturity, producing an inverted curve. Had we started with $r_0 < \theta$, the curve would slope upward.
+
+\subsection*{Part (c): Closed-Form Bond Prices and Comparison}
+
+The CIR model admits a closed-form zero-coupon bond pricing formula. For face value $F = 1$ and $\gamma = \sqrt{\kappa^2 + 2\sigma^2}$:
+\[
+P(T) = A(T)\,e^{-B(T)\,r_0},
+\]
+where
+\[
+B(T) = \frac{2(e^{\gamma T}-1)}{(\gamma+\kappa)(e^{\gamma T}-1)+2\gamma}, \qquad
+A(T) = \left[\frac{2\gamma\,e^{(\kappa+\gamma)T/2}}{(\gamma+\kappa)(e^{\gamma T}-1)+2\gamma}\right]^{2\kappa\theta/\sigma^2}.
+\]
+
+With $\gamma = \sqrt{0.04 + 0.02} = \sqrt{0.06} \approx 0.2449$, the closed-form prices are computed below and compared to the Monte Carlo estimates.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{q4_cir_bond_price.png}
+  \caption{Zero-coupon bond prices from the closed-form CIR formula for maturities $T \in \{1, 2, 3, 5, 7, 10\}$ years, with $\kappa = 0.2$, $\theta = 0.04$, $\sigma = 0.10$, and $r_0 = 0.045$.}
+  \label{fig:cf_prices}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cccccc}
+\hline
+\textbf{Maturity} & \textbf{MC Price} & \textbf{MC SE} & \textbf{CF Price} & \textbf{Error} & \textbf{Within SE?} \\
+\hline
+1  & 0.95642 & 0.000342 & 0.95651 & $-0.00009$ & Yes \\
+2  & 0.91594 & 0.000856 & 0.91594 & $+0.00000$ & Yes \\
+3  & 0.87818 & 0.001381 & 0.87810 & $+0.00008$ & Yes \\
+5  & 0.81008 & 0.002316 & 0.80950 & $+0.00058$ & Yes \\
+7  & 0.74906 & 0.003078 & 0.74866 & $+0.00040$ & Yes \\
+10 & 0.66858 & 0.003830 & 0.66850 & $+0.00008$ & Yes \\
+\hline
+\end{tabular}
+\caption{Monte Carlo vs.\ closed-form CIR bond prices. All pricing errors are within one Monte Carlo standard error.}
+\label{tab:comparison}
+\end{table}
+
+All Monte Carlo pricing errors are within one standard error of zero, confirming that the simulation is correctly implemented and that $N = 100{,}000$ paths provides adequate precision for the shorter maturities. The Monte Carlo standard error grows with maturity because variance 
+in the integrated short rate $\int_0^T r_t\,dt$ accumulates over longer horizons, requiring more paths to achieve the same precision.
+
+\subsection*{Part (d): Duration and Convexity of the 10-Year Zero}
+
+We compute the modified duration and convexity of the 10-year zero-coupon bond numerically using central finite differences on the closed-form CIR pricing formula $P(r_0)$, with $\Delta r = 0.001$ (10 basis points):
+\[
+D \approx -\frac{1}{P}\cdot\frac{P(r_0+\Delta r) - P(r_0-\Delta r)}{2\,\Delta r}, \qquad
+C \approx \frac{1}{P}\cdot\frac{P(r_0+\Delta r) - 2P(r_0) + P(r_0-\Delta r)}{(\Delta r)^2}.
+\]
+
+Evaluating at $r_0 = 0.045$ with $P(r_0) = 0.6685$, $P(r_0+\Delta r) = 0.6658$, $P(r_0-\Delta r) = 0.6712$:
+
+\[
+\boxed{D \approx 4.07 \text{ years}, \qquad C \approx 16.58 \text{ years}^2.}
+\]
+
+\paragraph{Comparison to the simple approximation.}
+For a zero-coupon bond under a constant-rate model, duration equals maturity: $D = T = 10$ years. The CIR duration of 4.07 years is \emph{substantially lower}. This discrepancy arises because in the CIR model, the bond price is not simply $e^{-r_0 T}$---the $B(T)$ function captures the nonlinear, mean-reverting relationship between the short rate and the bond price. Because the CIR model implies that shocks to $r_0$ only partially propagate to longer-horizon discount rates (due to mean reversion), the price is far less sensitive to $r_0$ than a constant-rate model would suggest. The high convexity of 16.58 years$^2$ reflects the curvature of the price--rate relationship, which is itself amplified by the nonlinearity of $B(T)$.
+
 % ============================================================
 \section{Hedging a Bank's Interest Rate Risk}
 % ============================================================
