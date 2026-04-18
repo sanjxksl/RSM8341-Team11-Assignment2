@@ -504,6 +504,211 @@ the bar width at this scale.}
 \section{Hedging a Bank's Interest Rate Risk}
 % ============================================================
 
+We use the same CIR parameters from Section~4 throughout: $\kappa = 0.2$, $\theta = 0.04$, $\sigma = 0.10$, and $r_0 = 0.045$.
+
+\subsection{The Bank's Bond Portfolio}
+\label{sec:portfolio}
+
+\subsubsection{Bond Pricing}
+
+Each coupon-bearing bond is decomposed into a portfolio of zero-coupon bonds: one for each semi-annual coupon payment and one for the principal repayment at maturity. Using the CIR closed-form discount factor $P(t_i) = A(t_i)\,e^{-B(t_i)\,r_0}$ from Section~4, the price of a bond with face value $F$, coupon rate $c$, and maturity $T$ is:
+\[
+V = \sum_{i=1}^{2T} \frac{c}{2}\,F \cdot A(t_i)\,e^{-B(t_i)\,r_0} \;+\; F \cdot A(T)\,e^{-B(T)\,r_0}
+\]
+where $t_i = i/2$ are the semi-annual coupon dates. Table~\ref{tab:bond_prices} reports the market value of each bond under the CIR model.
+
+\begin{table}[H]
+\centering
+\caption{CIR bond prices at $r_0 = 4.5\%$.}
+\label{tab:bond_prices}
+\begin{tabular}{lcccc}
+\toprule
+Bond & Face Value (\$M) & Coupon Rate & Maturity & Market Value (\$M) \\
+\midrule
+Bond A & 500 & 2.5\% & 5 years  & 460.37 \\
+Bond B & 300 & 2.0\% & 10 years & 249.12 \\
+Bond C & 200 & 1.5\% & 20 years & 133.80 \\
+\midrule
+\multicolumn{4}{l}{\textbf{Total Portfolio $V_0$}} & \textbf{843.29} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three bonds are priced below their face values, which is expected since the current short rate of 4.5\% exceeds all three coupon rates. Bond~C suffers the steepest discount proportionally because it combines the lowest coupon (1.5\%) with the longest maturity (20 years), locking in a below-market rate for two decades.
+
+\subsubsection{Portfolio Duration}
+
+We compute the duration of each coupon bond using the central difference formula:
+\[
+D \approx -\frac{1}{V}\cdot\frac{V(r_0+\Delta r) - V(r_0-\Delta r)}{2\,\Delta r}
+\]
+with $\Delta r = 0.001$ (10 basis points), repricing the coupon bond under the CIR closed-form at the bumped rates. The portfolio duration is the market-value-weighted average of the individual bond durations. Table~\ref{tab:duration} reports the results.
+
+\begin{table}[H]
+\centering
+\caption{Individual bond durations (CIR-implied) and portfolio duration.}
+\label{tab:duration}
+\begin{tabular}{lccc}
+\toprule
+Bond & Duration & Weight & Contribution \\
+\midrule
+Bond A & 2.94 & 0.546 & 1.61 \\
+Bond B & 3.81 & 0.295 & 1.12 \\
+Bond C & 4.13 & 0.159 & 0.66 \\
+\midrule
+\multicolumn{3}{l}{\textbf{Portfolio Duration}} & \textbf{3.39} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The portfolio duration of 3.39 implies that a 100 basis point increase in the short rate would reduce the portfolio value by approximately $3.39\% \times \$843.29\text{M} \approx \$28.6\text{M}$.
+
+A notable feature of these results is that the CIR durations are substantially lower than the bond maturities. Bond~C, for example, has a 20-year maturity but only a duration of 4.13. This is a direct consequence of mean reversion in the CIR model: a change in today's short rate does not propagate fully to long-term discount rates because the model ``knows'' that rates will be pulled back toward $\theta = 4\%$. This is fundamentally different from the simple rule that duration $\approx$ maturity for a zero-coupon bond, which assumes a flat, non-mean-reverting yield curve \citep{Hull2022}.
+
+
+\subsection{Stress Testing}
+\label{sec:stress}
+
+\subsubsection{Deterministic Rate Shock}
+\label{sec:stress_deterministic}
+
+We shock the initial rate by 200 basis points ($r_0 \to 0.065$) and reprice the entire portfolio. Table~\ref{tab:stress} compares the actual loss to the duration-based and duration-plus-convexity approximations.
+
+\begin{table}[H]
+\centering
+\caption{Deterministic stress test: 200bp rate shock.}
+\label{tab:stress}
+\begin{tabular}{lc}
+\toprule
+Quantity & Value (\$M) \\
+\midrule
+Portfolio at $r_0 = 4.5\%$ & 843.29 \\
+Portfolio at $r_0 = 6.5\%$ & 788.17 \\
+\midrule
+Actual loss & $-55.12$ \\
+Duration-only approximation & $-57.11$ \\
+Duration + convexity approximation & $-55.07$ \\
+\midrule
+Gap (actual vs.\ duration-only) & 1.99 \\
+Convexity correction & 2.04 \\
+Remaining error & $-0.05$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The actual loss of \$55.12M represents a 6.54\% decline in portfolio value. Duration alone overpredicts the loss by approximately \$2M because it is a linear approximation applied to a curved price--rate relationship. The convexity correction of \$2.04M closes nearly the entire gap, leaving a residual error of only \$0.05M. This confirms that, even for a fairly large 200bp shock, the second-order Taylor expansion (duration plus convexity) provides an excellent approximation to the true repricing.
+
+\subsubsection{Monte Carlo Stress Test and Value-at-Risk}
+
+We simulate 10{,}000 CIR paths forward by one year using the Euler--Maruyama scheme with daily time steps ($\Delta t = 1/252$). Figure~\ref{fig:cir_paths} shows 20 sample paths alongside the mean path and the 5th/95th percentile bands.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{cir_paths.png}
+\caption{CIR simulated interest rate paths over one year. The mean path drifts from $r_0 = 4.5\%$ toward $\theta = 4\%$, consistent with mean reversion. The fan-shaped confidence band reflects increasing uncertainty over the horizon.}
+\label{fig:cir_paths}
+\end{figure}
+
+The mean terminal rate of 4.40\% confirms that rates drift toward $\theta$ over one year, though the reversion is slow ($\kappa = 0.2$). The 5th--95th percentile range spans roughly 1.7\% to 7.9\%, indicating substantial uncertainty.
+
+For each simulated terminal rate $r_1$, we reprice the portfolio at the reduced maturities (4, 9, and 19 years) and compute the one-year P\&L:
+\[
+\text{P\&L} = V_1(r_1) + \text{Coupons received} - V_0
+\]
+where annual coupons total \$21.50M (Bond~A: \$12.50M, Bond~B: \$6.00M, Bond~C: \$3.00M). Figure~\ref{fig:pnl_dist} shows the resulting P\&L distribution.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{pnl_distribution.png}
+\caption{Distribution of 1-year portfolio P\&L across 10{,}000 CIR scenarios.}
+\label{fig:pnl_dist}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{P\&L distribution summary and Value-at-Risk estimates.}
+\label{tab:var}
+\begin{tabular}{lc}
+\toprule
+Statistic & Value (\$M) \\
+\midrule
+Mean P\&L & $+37.97$ \\
+Standard deviation & $51.01$ \\
+5th percentile (VaR 95\%) & $-52.49$ \\
+1st percentile (VaR 99\%) & $-94.83$ \\
+Sample skewness & $-0.46$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On average, the portfolio gains \$38.0M over one year, driven by coupon income and the tendency for rates to drift toward $\theta = 4\%$ (which pushes bond prices up). However, the distribution exhibits a meaningful left tail: the 95\% VaR of \$52.5M and 99\% VaR of \$94.8M indicate that in adverse rate scenarios, the portfolio can suffer substantial losses. The distribution is \textbf{negatively skewed} (sample skewness $\approx -0.46$): the left tail extends out to roughly $-\$191$M, while the right tail is bounded near $+\$159$M. This asymmetry reflects the economics of a long-bond portfolio. Small or moderate rate movements are common and produce modest gains or losses, but large adverse rate increases, though less likely under mean reversion than they would be under a symmetric Gaussian model, still translate into outsized mark-to-market losses because of the convex (and locally quasi-linear) repricing of long-duration bonds. Favorable rate \emph{decreases} do produce gains, but those gains are bounded by the fact that the coupon and principal cash flows are fixed in nominal terms, capping how far the portfolio can appreciate.
+
+\subsection{Hedging with an Interest Rate Cap}
+\label{sec:cap}
+
+\subsubsection{Cap Pricing}
+
+An interest rate cap is a portfolio of caplets, each paying $\delta \cdot N \cdot \max(r_{t_i} - \bar{r},\, 0)$ at semi-annual reset dates, where $\delta = 0.5$, $N = \$1{,}000$M is the notional, and $\bar{r}$ is the strike rate. We price the 5-year cap (10 caplets) via Monte Carlo under the CIR model using 50{,}000 simulated paths.
+
+For each path, we compute each caplet's payoff, discount it back to time~0 using the path's realized short rates, and average across all paths. Table~\ref{tab:cap_prices} reports the cap prices at each strike in the range.
+
+\begin{table}[H]
+\centering
+\caption{Interest rate cap prices at all 25bp strike increments ($r_0 = 4.5\%$).}
+\label{tab:cap_prices}
+\begin{tabular}{cc}
+\toprule
+Strike Rate & Cap Price (\$M) \\
+\midrule
+5.00\% & 29.58 \\
+5.25\% & 26.22 \\
+5.50\% & 23.22 \\
+5.75\% & 20.55 \\
+6.00\% & 18.17 \\
+6.25\% & 16.06 \\
+6.50\% & 14.19 \\
+6.75\% & 12.53 \\
+7.00\% & 11.07 \\
+7.25\% &  9.77 \\
+7.50\% &  8.63 \\
+7.75\% &  7.63 \\
+8.00\% &  6.73 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As expected, cap prices decrease monotonically with the strike rate. A lower strike means the cap pays out more frequently (rates need to exceed a lower threshold), providing more protection but at a higher cost.
+
+\subsubsection{Net Hedged P\&L under the 200bp Shock}
+
+To evaluate the hedge, we reprice each cap at the shocked rate ($r_0 = 0.065$) and compute the net P\&L of the hedged portfolio:
+\[
+\text{Net P\&L} = \underbrace{\text{Portfolio loss}}_{\text{from \S\ref{sec:stress_deterministic}}} + \underbrace{\text{Cap gain}}_{\text{shocked price} - \text{original price}} - \underbrace{\text{Cap premium}}_{\text{original price}}
+\]
+
+To eliminate Monte Carlo noise from the cap-gain term, we price the original and shocked caps using \emph{common random numbers} (the same seed for both sets of simulated paths). This way the difference $\text{cap}(r_\text{shocked}) - \text{cap}(r_0)$ reflects only the change in the starting short rate, not sampling variability. Figure~\ref{fig:hedged_pnl} decomposes the net hedged P\&L by its three components across all strike rates.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{hedged_pnl.png}
+\caption{Net hedged P\&L decomposition under a 200bp shock. The portfolio loss (black, dashed red reference) is constant at $-\$55.1$M. The cap gain (blue) and premium cost (yellow, plotted as a negative) move in opposite directions as the strike increases. The net hedged P\&L (green) is remarkably flat across strikes.}
+\label{fig:hedged_pnl}
+\end{figure}
+
+The optimal strike is $\bar{r} = 7.00\%$, which yields a net P\&L of $-\$52.75$M, an improvement of only \$2.36M ($\approx 4.3\%$) relative to the unhedged loss of $-\$55.12$M.
+
+\subsubsection{Interpretation}
+
+The plot reveals several important insights about using options to hedge interest rate risk.
+
+\textbf{The cost--protection tradeoff.} Low-strike caps (5\%) provide the most protection (largest cap gain) but are expensive; high-strike caps (8\%) are cheap but offer little benefit because they only pay out in extreme scenarios. The net P\&L curve is remarkably flat, meaning no matter which strike the bank chooses, the premium roughly offsets the additional protection. The best strike (7.00\%) saves only \$2.36M on a \$55.12M loss, about a 4\% improvement.
+
+\textbf{Why the cap provides limited protection.} The fundamental issue is a \emph{maturity mismatch}. The cap covers 5 years of rate risk, but the portfolio's largest sources of interest rate sensitivity are Bond~B (10-year) and Bond~C (20-year). The portfolio losses from a 200bp shock reflect the full repricing of these long-duration bonds at the new rate level, whereas the cap's value is limited to 10 semi-annual caplet payoffs within its 5-year horizon. Moreover, mean reversion in the CIR model causes the caplets in later years to have diminishing value: the model anticipates that rates will drift back toward $\theta = 4\%$, reducing the expected payoffs of distant caplets.
+
+\textbf{The shape of the curve.} The flatness of the net P\&L line reflects a fundamental property of options as hedging instruments: the market prices the cap to reflect the probability-weighted expected payoffs. Buying more protection (lower strike) costs proportionally more, so the net benefit remains small.
+
+\textbf{Practical implications.} The natural fix is to match the hedge's horizon to the portfolio's risk profile. A 10-year or 20-year cap would cover the reset dates that actually drive Bond~B and Bond~C's repricing, whereas the 5-year cap we priced here simply expires before most of the portfolio's rate sensitivity plays out. The bank could also reduce the underlying exposure directly by rebalancing toward shorter-duration bonds, which would shrink the portfolio duration of 3.39 and make the remaining risk small enough for a 5-year cap to meaningfully offset. The broader lesson is that the flatness of the net-P\&L curve in Figure~\ref{fig:hedged_pnl} is not a failure of the cap as an instrument; it reflects a mismatch between the horizon of the hedge and the horizon of the risk. Under the CIR dynamics we've estimated, a cap whose caplets line up with the years where the portfolio is actually sensitive to rates would produce a much steeper, more informative net-P\&L curve and a genuinely worthwhile hedge at the right strike.
+
 % ============================================================
 \section{AI Disclosure}
 % ============================================================
