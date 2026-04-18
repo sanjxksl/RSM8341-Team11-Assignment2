@@ -783,7 +783,7 @@ the bar width at this scale.}
 \section{The CIR Model and Bond Pricing}
 % ============================================================
 
-\subsection*{Part (a): Monte Carlo Simulation and Zero-Coupon Bond Prices}
+\subsection{Part (a): Monte Carlo Simulation and Zero-Coupon Bond Prices}
 
 We simulate the CIR short-rate process using the Euler--Maruyama scheme with daily time steps ($\Delta t = 1/252$):
 \[
@@ -856,7 +856,7 @@ The mean path does converge to $\theta = 0.04$. Starting from $r_0 = 0.045$, the
 \label{tab:mc_prices}
 \end{table}
 
-\subsection*{Part (b): Yield Curve}
+\subsection{Part (b): Yield Curve}
 
 The continuously compounded yield at maturity $T$ is extracted from the Monte Carlo bond prices by inverting the zero-coupon pricing formula $P = e^{-y(T)\,T}$:
 \[
@@ -872,7 +872,7 @@ y(T) = -\frac{\ln P(T)}{T}.
 
 The yield curve is \textbf{downward-sloping} (inverted). This is expected given that $r_0 = 0.045 > \theta = 0.04$: the short rate starts above its long-run mean and is expected to revert downward. At short maturities, discounting is dominated by the current high rate; at longer maturities, more weight falls on future periods when the rate is expected to be closer to 4\%. Thus the effective average discount rate falls with maturity, producing an inverted curve. Had we started with $r_0 < \theta$, the curve would slope upward.
 
-\subsection*{Part (c): Closed-Form Bond Prices and Comparison}
+\subsection{Part (c): Closed-Form Bond Prices and Comparison}
 
 The CIR model admits a closed-form zero-coupon bond pricing formula. For face value $F = 1$ and $\gamma = \sqrt{\kappa^2 + 2\sigma^2}$:
 \[
@@ -914,7 +914,7 @@ With $\gamma = \sqrt{0.04 + 0.02} = \sqrt{0.06} \approx 0.2449$, the closed-form
 All Monte Carlo pricing errors are within one standard error of zero, confirming that the simulation is correctly implemented and that $N = 100{,}000$ paths provides adequate precision for the shorter maturities. The Monte Carlo standard error grows with maturity because variance 
 in the integrated short rate $\int_0^T r_t\,dt$ accumulates over longer horizons, requiring more paths to achieve the same precision.
 
-\subsection*{Part (d): Duration and Convexity of the 10-Year Zero}
+\subsection{Part (d): Duration and Convexity of the 10-Year Zero}
 
 We compute the modified duration and convexity of the 10-year zero-coupon bond numerically using central finite differences on the closed-form CIR pricing formula $P(r_0)$, with $\Delta r = 0.001$ (10 basis points):
 \[
@@ -1148,7 +1148,7 @@ Large language models (LLMs) were used for task explanation, code debugging, and
 Additionally, LLMs were used for \LaTeX{} formatting and report editing.
 All analysis, interpretation, and discussion were thoroughly reviewed and verified by the group.
 
-The following LLMs were used: Claude, Gemini, ...
+Specifically, Anthropic's Claude and OpenAI's ChatGPT were used.
 
 Overall, LLMs performed well when given specific tasks and instructions. They were particularly 
 useful for \LaTeX{} formatting tasks, which are tedious when done manually. However, their output requires 
