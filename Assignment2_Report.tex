@@ -14,6 +14,11 @@
 \usepackage[T1]{fontenc}
 \usepackage{natbib}
 
+% FOR TREE -- 
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+% -- FOR TREE 
+
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}
 
@@ -329,45 +334,323 @@ relative to the log-normal \citep{Rubinstein1994}. Stochastic volatility models,
 mean-reverting process, which generates the maturity-dependent negative skew that
 Black--Scholes cannot produce.
 
+
 % ============================================================
 \section{Option Pricing: Black-Scholes, Monte Carlo, and Binomial Trees}
 % ============================================================
 
-In this section, we price the same European call option using three different 
-approaches: Black-Scholes (closed-form), Monte Carlo simulation, and a binomial lattice model. 
-The chosen stock for the European call option is Eli Lilly and Company (LLY).
+In this section, we price an at-the-money (ATM) European call option on Eli Lilly and Company (LLY) using three distinct numerical frameworks: the Black--Scholes closed-form model, Monte Carlo simulation, and the Cox--Ross--Rubinstein (CRR) binomial lattice. All three methods are applied to the same option and the same inputs, allowing for a direct comparison of their accuracy, speed, and conceptual structure.
+ 
+\subsection{Model Setup and Parameters}
+ 
+The underlying asset is Eli Lilly and Company (LLY). As of the market close on April 10, 2026, the spot price was $S_0 = \$939.47$ (\cite{YAHOO_LLY_Q2}). For an ATM call, the strike price is set equal to the spot price: $K = S_0 = \$939.47$.
+ 
+The risk-free rate $r = 3.71\%$ is taken from the 6-Month U.S.\ Treasury Constant
+Maturity Rate as of April 9, 2026, sourced from the FRED database (\cite{FRED_DGS6MO_Q2}). The 6-month maturity was chosen to
+match the option's expiration horizon of $T = 0.5$ years, as using a rate whose term aligns with the option's life avoids any bias that would arise from mismatching maturities. The implied volatility $\sigma = 26.90\%$ is the ATM implied volatility derived from the LLY volatility surface in Section 1. All three methods use these identical inputs.
+ 
+\subsection{Black-Scholes Benchmark}
+\label{sec:q2_bs}
+ 
+The Black--Scholes formula provides the theoretical, closed-form price of a European call under the assumption that the stock price follows geometric Brownian motion with constant volatility. It is the natural starting point because it gives an exact answer. The price, $C$, is:
+\begin{equation}
+    C = S_0 N(d_1) - K e^{-rT} N(d_2), \qquad
+    d_1 = \frac{\ln(S_0/K) + (r + \sigma^2/2)\,T}{\sigma\sqrt{T}}, \quad
+    d_2 = d_1 - \sigma\sqrt{T},
+    \label{eq:bs_q2}
+\end{equation}
+where $N(\cdot)$ is the standard normal CDF.
+ 
+Substituting the parameters, we obtain $d_1 \approx 0.1926$ and $d_2 \approx 0.0024$,
+giving a Black--Scholes call price of $\$79.50$. This serves as the benchmark
+against which the following two numerical methods are evaluated.
+ 
+Intuitively, the formula prices the option by decomposing it into two pieces: the
+expected value of receiving the stock if the option finishes in the money
+($S_0 N(d_1)$), minus the expected cost of paying the strike ($K e^{-rT} N(d_2)$). The
+quantities $N(d_1)$ and $N(d_2)$ are risk-neutral probabilities that adjust for the
+uncertainty of whether the option will be exercised.
+ 
+\subsection{Monte Carlo Simulation}
+\label{sec:q2_mc}
+ 
+Monte Carlo pricing is based on the idea that the fair price of any derivative is the discounted expected payoff under the risk-neutral measure:
+\begin{equation}
+    C = e^{-rT}\, \mathbb{E}^{\mathbb{Q}}\!\left[\max(S_T - K,\, 0)\right].
+    \label{eq:rn_price}
+\end{equation}
+When no closed-form solution exists, we can estimate this expectation by simulating many possible future stock price paths and averaging the resulting payoffs.
+ 
+We model stock price evolution under the risk-neutral measure using geometric Brownian motion, discretized via the Euler--Maruyama scheme over $n = 126$ daily time steps ($\Delta t = T/n$):
+\begin{equation}
+    S_{t+\Delta t} = S_t + r S_t \Delta t + \sigma S_t \sqrt{\Delta t}\, Z_t, \qquad
+    Z_t \sim \mathcal{N}(0,1).
+    \label{eq:euler}
+\end{equation}
+The Monte Carlo estimate is then:
+\begin{equation}
+    \hat{C} = e^{-rT} \cdot \frac{1}{N}\sum_{i=1}^{N}\max\!\left(S_T^{(i)} - K,\, 0\right),
+\end{equation}
+with standard error $\mathrm{SE} = \hat{\sigma}_{\text{payoff}} / \sqrt{N}$ and 95\%
+confidence interval $\hat{C} \pm 1.96 \cdot \mathrm{SE}$.
+ 
+\subsubsection{Convergence and Accuracy}
+ 
+We run the simulation for path counts ranging from $N = 100$ to $N = 500{,}000$,
+comparing the MC estimate to the Black--Scholes benchmark at each step.
+ 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{q2_mc.png}
+\caption{Monte Carlo convergence plot. The estimated call price $\pm 2$ standard errors is shown as a function of path count $N$. The horizontal line is the Black--Scholes benchmark of \$79.50. The shaded band narrows steadily as $N$ grows, illustrating the $1/\sqrt{N}$ decay in estimation error.}
+\label{fig:mc_convergence}
+\end{figure}
+ 
+At $N = 100$, the estimate is highly unstable. The standard error of \$14.35 means the 95\% confidence interval spans roughly \$56, wider than the option price itself. The estimate first stabilizes to within 1\% of the Black--Scholes price at $N = 384$. By $N = 500{,}000$, the MC price reaches \$79.45 with a standard error of \$0.17 and a 95\% confidence interval of $[\$79.11,\, \$79.79]$.
+ 
+The MC estimate does not converge exactly to the Black--Scholes price for two
+reasons. First, there is unavoidable sampling error: any finite simulation has
+random noise, measured by the standard error. Second, there is a small discretization bias: the Euler--Maruyama scheme approximates a continuous
+process with discrete steps. Although GBM has an exact analytical solution for $S_T$, our step-by-step simulation accumulates a small drift away from the true distribution as a result of discretizing time. 
 
-We use the following information for the pricing:
-- On April 10th, 2026, LLY closed at $939.47 per share (CITE). 
-- As of April 9th, 2026, the risk-free rate for U.S. Treasury Securities at 6-Month Constant Maturity is 3.71\% (CITE).
-- The time to expiry is 6 months.
-- For an at-the-money European call option, the strike price is equal to the stock price, $939.47.
-- The at-the-money implied volatility for LLY, calculated in Section 1, is 26.90\%. 
+\begin{table}[H]
+\centering
+\caption{Monte Carlo estimates at selected path counts ($n = 126$ Euler--Maruyama steps,
+Black--Scholes benchmark \$79.50).}
+\label{tab:mc_selected}
+\begin{tabular}{rrrrr}
+\toprule
+$N$ & MC Price (\$) & SE (\$) & 95\% CI & Rel.\ Error \\
+\midrule
+100     & 88.65 & 14.35 & [60.52, 116.78] & 11.5\% \\
+384     & 79.61 &  6.38 & [67.10, 92.12]  &  0.1\% \\
+2,306   & 78.79 &  2.52 & [73.85, 83.73]  &  0.9\% \\
+13,852  & 80.41 &  1.04 & [78.37, 82.45]  &  1.1\% \\
+130,293 & 79.94 &  0.34 & [79.27, 80.61]  &  0.6\% \\
+500,000 & 79.45 &  0.17 & [79.11, 79.79]  &  0.1\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\subsection{Binomial Lattice}
+\label{sec:q2_binom}
+ 
+The Cox--Ross--Rubinstein (CRR) binomial model takes a different approach to option pricing. Rather than simulating many random paths, it builds a recombining tree of all possible stock price trajectories and prices the option by working backwards through time. The two approaches are logically equivalent in the sense that they both estimate the same risk-neutral expectation, but the tree makes the pricing logic more transparent.
+ 
+At each time step $\Delta t = T/N$, the stock can either rise by a factor $u$ or fall by a factor $d$:
+\begin{equation}
+    u = e^{\sigma\sqrt{\Delta t}}, \quad d = \frac{1}{u}, \quad
+    q = \frac{e^{r\Delta t} - d}{u - d},
+    \label{eq:crr_params}
+\end{equation}
+where $q$ is the risk-neutral probability of an up-move. At each node, the option value is the discounted expected value of its two possible successor nodes:
+\begin{equation}
+    C_{i,j} = e^{-r\Delta t}\left[q\, C_{i+1,j+1} + (1-q)\, C_{i+1,j}\right].
+    \label{eq:backward_induction}
+\end{equation}
+Starting from the known terminal payoffs $\max(S_T - K, 0)$, we apply
+Equation~\eqref{eq:backward_induction} repeatedly until we reach $C_{0,0}$, the price
+today.
+ 
+\subsubsection{Full Three-Step Tree}
+ 
+To illustrate the mechanics, we construct a $N = 3$ step tree. The derived lattice
+parameters are:
+\begin{itemize}
+    \item Step size: $\Delta t = 0.5/3 = 0.1\overline{6}$ years.
+    \item Up factor: $u = e^{0.2690\sqrt{0.1\overline{6}}} \approx 1.1161$.
+    \item Down factor: $d = 1/u \approx 0.8960$.
+    \item Risk-neutral probability: $q \approx 0.5008$.
+    \item Step discount factor: $e^{-r\Delta t} \approx 0.9938$.
+\end{itemize}
+ 
+\textbf{Forward stock price tree.} At node $(i,j)$ (time step $i$, $j$ up-moves),
+$S_{i,j} = S_0\, u^j\, d^{i-j}$:
+ 
+\begin{center}
+\begin{tabular}{ll}
+$T_0$: & $S_0 = \$939.47$ \\
+$T_1$: & $S_u = \$1{,}048.52$; \quad $S_d = \$841.76$ \\
+$T_2$: & $S_{uu} = \$1{,}170.23$; \quad $S_{ud} = \$939.47$; \quad $S_{dd} = \$754.21$ \\
+$T_3$: & $S_{uuu} = \$1{,}306.06$; \quad $S_{uud} = \$1{,}048.52$;
+         \quad $S_{udd} = \$841.76$; \quad $S_{ddd} = \$675.77$ \\
+\end{tabular}
+\end{center}
+ 
+\textbf{Terminal payoffs} $\max(S_T - K, 0)$ with $K = \$939.47$:
+\begin{center}
+$C_{uuu} = \$366.59$; \quad $C_{uud} = \$109.05$; \quad $C_{udd} = \$0$; \quad $C_{ddd} = \$0$.
+\end{center}
+ 
+\textbf{Backward induction.} We collapse the tree one period at a time:
+ 
+At $T_2$:
+\begin{align*}
+C_{uu} &= 0.9938 \times [0.5008(366.59) + 0.4992(109.05)] = \$236.55, \\
+C_{ud} &= 0.9938 \times [0.5008(109.05) + 0.4992(0)] = \$54.27, \\
+C_{dd} &= \$0.
+\end{align*}
+At $T_1$:
+\begin{align*}
+C_{u} &= 0.9938 \times [0.5008(236.54) + 0.4992(54.27)] = \$144.65, \\
+C_{d} &= 0.9938 \times [0.5008(54.27) + 0.4992(0)] = \$27.01.
+\end{align*}
+At $T_0$:
+\begin{equation*}
+C_0 = 0.9938 \times [0.5008(144.64) + 0.4992(27.01)] = \mathbf{\$85.39}.
+\end{equation*}
 
-\subsubsection{Black-Scholes}
+The complete tree is as follows:
 
-In this section, we price the European call option using the Black-Scholes formula.
-The Black-Scholes formula for a European call option is:
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    scale=1.0,
+    node/.style={align=center, font=\small},
+    edge/.style={->, thin}
+]
 
-$$C = S\,N(d_1) - K e^{-rT} N(d_2), \qquad
-d_1 = \frac{\ln(S/K) + (r + \sigma^2/2)\,T}{\sigma\sqrt{T}}, \quad
-d_2 = d_1 - \sigma\sqrt{T},
-$$
-where $S$ is the stock price, $K$ is the strike price, $T$ is the time to expiry, $r$ is the risk-free rate, and $\sigma$ is the implied volatility.
-$N(\cdot)$ is the standard normal cumulative distribution function (CDF).
+% Spacing
+\def\dx{3.5}  % horizontal spacing
+\def\dy{1.6}  % vertical spacing
 
-[TODO: expand?]
+% ── T0 ──
+\node[node] (S00) at (0, 0) {$\$939.47$\\{\footnotesize $C=\$85.39$}};
 
-The Black-Scholes price of the LLY call option is \$79.50.
-We use this price as the benchmark for the Monte Carlo and binomial lattice pricing.
+% ── T1 ──
+\node[node] (S11) at (\dx,  \dy) {$\$1{,}048.52$\\{\footnotesize $C=\$144.65$}};
+\node[node] (S10) at (\dx, -\dy) {$\$841.76$\\{\footnotesize $C=\$27.01$}};
 
-[TODO: interpret?]
+% ── T2 ──
+\node[node] (S22) at (2*\dx,  2*\dy) {$\$1{,}170.23$\\{\footnotesize $C=\$236.55$}};
+\node[node] (S21) at (2*\dx,  0)     {$\$939.47$\\{\footnotesize $C=\$54.27$}};
+\node[node] (S20) at (2*\dx, -2*\dy) {$\$754.21$\\{\footnotesize $C=\$0.00$}};
 
-\subsubsection{Monte Carlo}
+% ── T3 ──
+\node[node] (S33) at (3*\dx,  3*\dy) {$\$1{,}306.06$\\{\footnotesize $C=\$366.59$}};
+\node[node] (S32) at (3*\dx,    \dy) {$\$1{,}048.52$\\{\footnotesize $C=\$109.05$}};
+\node[node] (S31) at (3*\dx,   -\dy) {$\$841.76$\\{\footnotesize $C=\$0.00$}};
+\node[node] (S30) at (3*\dx, -3*\dy) {$\$675.77$\\{\footnotesize $C=\$0.00$}};
 
+% ── Edges T0 -> T1 ──
+\draw (S00) -- (S11);
+\draw (S00) -- (S10);
 
+% ── Edges T1 -> T2 ──
+\draw (S11) -- (S22);
+\draw (S11) -- (S21);
+\draw (S10) -- (S21);
+\draw (S10) -- (S20);
 
-\subsubsection{Binomial Lattice}
+% ── Edges T2 -> T3 ──
+\draw (S22) -- (S33);
+\draw (S22) -- (S32);
+\draw (S21) -- (S32);
+\draw (S21) -- (S31);
+\draw (S20) -- (S31);
+\draw (S20) -- (S30);
+
+% ── Time labels ──
+\node[font=\small\itshape] at (0,      -3*\dy-0.6) {$T_0$};
+\node[font=\small\itshape] at (\dx,    -3*\dy-0.6) {$T_1$};
+\node[font=\small\itshape] at (2*\dx,  -3*\dy-0.6) {$T_2$};
+\node[font=\small\itshape] at (3*\dx,  -3*\dy-0.6) {$T_3$};
+
+% ── Dashed vertical time lines ──
+\draw[dashed, gray] (0,     -3*\dy-0.2) -- (0,      3*\dy+0.5);
+\draw[dashed, gray] (\dx,   -3*\dy-0.2) -- (\dx,    3*\dy+0.5);
+\draw[dashed, gray] (2*\dx, -3*\dy-0.2) -- (2*\dx,  3*\dy+0.5);
+\draw[dashed, gray] (3*\dx, -3*\dy-0.2) -- (3*\dx,  3*\dy+0.5);
+
+\end{tikzpicture}
+\caption{Three-step CRR binomial tree for the LLY ATM European call
+($S_0 = K = \$939.47$, $T = 0.5$ yr, $r = 3.71\%$, $\sigma = 26.90\%$).
+Each node shows the stock price (top) and option value (bottom).}
+\label{fig:binom_tree}
+\end{figure}
+
+With only three steps, the tree produces a price of \$85.39, approximately 7.1\% above the Black--Scholes benchmark of \$79.50. This gap is expected as a three-step tree is a crude discretization of the continuous-time process, and the stock price can only reach four terminal values rather than the full continuum of outcomes Black--Scholes considers. As $N$ increases, each step size $\Delta t$ shrinks, the tree fills in more price paths, and the price converges to the Black--Scholes value.
+ 
+\subsubsection{Convergence to the Black--Scholes Limit}
+ 
+Figure~\ref{fig:binom_convergence} plots the CRR price as a function of $N$ from 3 to 500 steps, with the Black--Scholes price shown as a horizontal line. The binomial price oscillates above and below the benchmark at low $N$, but the amplitude of these oscillations decreases rapidly as $N$ increases. At $N = 500$, the binomial price is \$79.46, within \$0.04 of the benchmark.
+ 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{q2_CRR.png}
+\caption{CRR binomial convergence to the Black--Scholes benchmark for the LLY ATM call ($T = 0.5$ yr). Each point is one tree evaluation. The horizontal line is the
+Black--Scholes price of \$79.50}
+\label{fig:binom_convergence}
+\end{figure}
+ 
+This convergence is consistent with our understanding of CRR and Black--Scholes. As $N \to \infty$ and $\Delta t \to 0$, the
+binomial distribution of up an down moves converges to the log-normal distribution that Black--Scholes assumes. The CRR tree is a discrete approximation to continuous-time GBM, and Black--Scholes is its continuous-time limit.
+ 
+\subsection{Comparison of Methods}
+\label{sec:q2_compare}
+ 
+Table~\ref{tab:method_compare} summarises the three methods.
+ 
+\begin{table}[H]
+\centering
+\caption{Comparison of option pricing methods for the LLY ATM European call
+($S_0 = K = \$939.47$, $T = 0.5$ yr, $r = 3.71\%$, $\sigma = 26.90\%$).}
+\label{tab:method_compare}
+\begin{tabular}{llrr}
+\toprule
+Method & Configuration & Price (\$) & Wall-clock time (s) \\
+\midrule
+Black--Scholes        & Closed form                         & 79.50 & 0.000061 \\
+Monte Carlo           & $N = 500{,}000$ paths, 126 EM steps & 79.45 & 0.743 \\
+CRR Binomial          & $N = 500$ steps                     & 79.46 & 0.034 \\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+All three methods fall within \$0.05, confirming that the numerical methods converge to the benchmark. Their practical trade-offs, however, differ:
+ 
+\textbf{Black--Scholes} is by far the fastest (under $0.1$ milliseconds) and produces an exact answer under its assumptions. It is the natural choice when those assumptions hold, such as for European-style options with known, constant volatility. 
+
+As discussed in lecture, many of those assumptions are violated in practice: volatility changes over time, transaction costs and discrete trading create hedging errors, and stock prices can jump based on earnings or news stories. It is therefore not an appropriate choice when pricing non-European options or options with early-exercise features. Nonetheless, Black--Scholes remains the universal benchmark for option pricing.
+ 
+\textbf{Monte Carlo} is the slowest of the three methods but 
+offers the broadest applicability. Its key advantage is that it 
+can be used when the payoff depends on the path followed by the 
+underlying asset, not just its terminal value \citep[Ch.21]{Hull2022}. This is why it is the natural  tool for pricing exotic options where the payoff depends on the average price over the life of the option. The method also extends to 
+derivatives whose payoffs depend on several underlying market 
+variables simultaneously. 
+
+The drawbacks are that it is computationally very time consuming and cannot 
+easily handle situations where there are early exercise 
+opportunities \citep[Ch.21]{Hull2022}. In our implementation, 
+achieving a standard error below \$0.20 required 500,000 
+simulated paths and took approximately 0.74 seconds, illustrating 
+the $1/\sqrt{N}$ decay in estimation error that makes high 
+precision computationally expensive.
+
+\textbf{The CRR binomial tree} occupies a middle ground between 
+Black--Scholes and Monte Carlo. It is substantially faster than 
+Monte Carlo at comparable accuracy (34 milliseconds versus 743 
+milliseconds). Its most important practical advantage over 
+Black--Scholes is the ability to handle American-style early 
+exercise: because the tree prices the option node-by-node 
+working backwards through time, it is straightforward to check 
+at each node whether immediate exercise is more valuable than 
+holding \citep[Ch.21]{Hull2022}. There are no closed-form analytic solutions for American options, making the binomial tree the standard tool for pricing them. Furthermore, as the number of steps 
+$N \to \infty$ and $\Delta t \to 0$, the binomial price converges 
+to the Black--Scholes price. 
+
+The tree's main limitation arises when the payoff depends on the specific path taken by the stock price rather than just its 
+terminal value: incorporating known dollar dividends, for 
+instance, causes the tree to become non-recombining, so that the 
+number of nodes grows exponentially with the number of steps 
+\citep[Ch.21]{Hull2022}. 
+
+In summary, the three methods offer distinct advantages: 
+Black--Scholes for speed and analytical precision under its 
+assumptions, the binomial tree for American-style early exercise, 
+and Monte Carlo for path-dependent and exotic derivatives where 
+no closed-form solution exists.
 
 % ============================================================
 \section{Pricing Exotic Options}
@@ -856,13 +1139,20 @@ The plot reveals several important insights about using options to hedge interes
 \textbf{The shape of the curve.} The flatness of the net P\&L line reflects a fundamental property of options as hedging instruments: the market prices the cap to reflect the probability-weighted expected payoffs. Buying more protection (lower strike) costs proportionally more, so the net benefit remains small.
 
 \textbf{Practical implications.} The natural fix is to match the hedge's horizon to the portfolio's risk profile. A 10-year or 20-year cap would cover the reset dates that actually drive Bond~B and Bond~C's repricing, whereas the 5-year cap we priced here simply expires before most of the portfolio's rate sensitivity plays out. The bank could also reduce the underlying exposure directly by rebalancing toward shorter-duration bonds, which would shrink the portfolio duration of 3.39 and make the remaining risk small enough for a 5-year cap to meaningfully offset. The broader lesson is that the flatness of the net-P\&L curve in Figure~\ref{fig:hedged_pnl} is not a failure of the cap as an instrument; it reflects a mismatch between the horizon of the hedge and the horizon of the risk.
+
 % ============================================================
 \section{AI Disclosure}
 % ============================================================
 
-Large language models were used for task explanation, code debugging, and \LaTeX{}
-formatting. All analysis, interpretation, and written discussion were produced and
-verified by the group.
+Large language models (LLMs) were used for task explanation, code debugging, and code generation, such as generating graphs or writing functions. 
+Additionally, LLMs were used for \LaTeX{} formatting and report editing.
+All analysis, interpretation, and discussion were thoroughly reviewed and verified by the group.
+
+The following LLMs were used: Claude, Gemini, ...
+
+Overall, LLMs performed well when given specific tasks and instructions. They were particularly 
+useful for \LaTeX{} formatting tasks, which are tedious when done manually. However, their output requires 
+thorough review, especially for complex and technical tasks.
 
 % ============================================================
 \bibliographystyle{plainnat}
@@ -883,6 +1173,13 @@ Board of Governors of the Federal Reserve System (US) (2025).
 1-Year Treasury Constant Maturity Rate [DGS1].
 Federal Reserve Bank of St.\ Louis FRED database.
 Retrieved from \url{https://fred.stlouisfed.org/series/DGS1}, August 29, 2025.
+
+% Question 2
+\bibitem[Board of Governors(2026)]{FRED_DGS6MO_Q2}
+Board of Governors of the Federal Reserve System (US) (2025).
+6-Month Treasury Constant Maturity Rate [DGS6MO].
+Federal Reserve Bank of St.\ Louis FRED database.
+Retrieved from \url{https://fred.stlouisfed.org/series/DGS6MO}, April 9th, 2026.
 
 \bibitem[Doran and Ronn(2008)]{Doran2008}
 Doran, J.\ S.\ and Ronn, E.\ I.\ (2008).
@@ -909,6 +1206,12 @@ Recovering risk aversion from option prices and realized returns.
 Rubinstein, M.\ (1994).
 Implied binomial trees.
 \textit{Journal of Finance}, 49(3), 771--818.
+
+% Question 2
+\bibitem[Yahoo Finance(2026)]{YAHOO_LLY_Q2}
+Yahoo Finance (2026).
+Eli Lilly and Company (LLY)
+Retrieved from \url{https://ca.finance.yahoo.com/quote/LLY/history/}, April 10th, 2026.
 
 \end{thebibliography}
 
